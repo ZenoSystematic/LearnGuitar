@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Cây đàn dựng thẳng rồi xoay 45 độ quanh tâm. Toàn bộ nằm trong vùng an toàn của icon. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="45">
+
+        <!-- Thân đàn -->
+        <path
+            android:fillColor="#E08A2E"
+            android:pathData="M54,49 C61,49 66,53 66,58 C66,62 61,64 61,67 C61,69 68,71 68,78 C68,84 62,87 54,87 C46,87 40,84 40,78 C40,71 47,69 47,67 C47,64 42,62 42,58 C42,53 47,49 54,49 Z"
+            android:strokeColor="#7A3E0E"
+            android:strokeWidth="1.2" />
+
+        <!-- Cần đàn -->
+        <path
+            android:fillColor="#3B2415"
+            android:pathData="M51,29 H57 V56 H51 Z" />
+
+        <!-- Đầu đàn -->
+        <path
+            android:fillColor="#5A3A22"
+            android:pathData="M51,21 H57 Q58,21 58,22 V29 H50 V22 Q50,21 51,21 Z" />
+
+        <!-- Các phím đàn -->
+        <path
+            android:pathData="M51,34 H57 M51,39 H57 M51,44 H57 M51,49 H57 M51,54 H57"
+            android:strokeColor="#CFC7B8"
+            android:strokeWidth="0.6" />
+
+        <!-- Ngựa đàn -->
+        <path
+            android:fillColor="#3B2415"
+            android:pathData="M49,77 H59 V79.2 H49 Z" />
+
+        <!-- Lỗ thoát âm -->
+        <path
+            android:fillColor="#2A170A"
+            android:pathData="M49.4,68.5 A4.6,4.6 0 1 0 58.6,68.5 A4.6,4.6 0 1 0 49.4,68.5 Z" />
+
+        <!-- Sáu dây đàn -->
+        <path
+            android:pathData="M51.5,24 V78 M52.5,24 V78 M53.5,24 V78 M54.5,24 V78 M55.5,24 V78 M56.5,24 V78"
+            android:strokeColor="#EFE8D8"
+            android:strokeWidth="0.35" />
+
+        <!-- Khóa chỉnh dây -->
+        <path
+            android:fillColor="#D9D2C2"
+            android:pathData="M47.6,24 A1,1 0 1 0 49.6,24 A1,1 0 1 0 47.6,24 Z M47.6,27 A1,1 0 1 0 49.6,27 A1,1 0 1 0 47.6,27 Z M58.4,24 A1,1 0 1 0 60.4,24 A1,1 0 1 0 58.4,24 Z M58.4,27 A1,1 0 1 0 60.4,27 A1,1 0 1 0 58.4,27 Z" />
+    </group>
+</vector>
