@@ -105,6 +105,7 @@ private fun loadBoxes(saved: String?): List<Int> {
 @Composable
 fun StringQuizScreen() {
     val context = LocalContext.current
+    val haptics = rememberHaptics()
     val prefs = remember {
         context.applicationContext.getSharedPreferences("strings", Context.MODE_PRIVATE)
     }
@@ -159,10 +160,12 @@ fun StringQuizScreen() {
             if (recentTimes.size > 10) recentTimes.removeAt(0)
             // Chỉ tăng mức thuộc khi trả lời đúng VÀ nhanh
             if (timeMs <= FAST_MS) boxes[item] = minOf(4, boxes[item] + 1)
+            haptics.correct()
             if (soundOn) SoundFx.playCorrect()
         } else {
             streak = 0
             boxes[item] = maxOf(0, boxes[item] - 2)
+            haptics.wrong()
             if (soundOn) SoundFx.playWrong()
         }
         saveBoxes()
@@ -176,6 +179,7 @@ fun StringQuizScreen() {
         streak = 0
         val item = question.item
         boxes[item] = maxOf(0, boxes[item] - 2)
+        haptics.wrong()
         if (soundOn) SoundFx.playWrong()
         saveBoxes()
     }
@@ -217,17 +221,15 @@ fun StringQuizScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Đố tên dây",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = {
-                soundOn = !soundOn
-                prefs.edit().putBoolean("sound", soundOn).apply()
-            }) { Text(if (soundOn) "🔊 Bật tiếng" else "🔇 Tắt tiếng") }
-        }
+        ScreenHeader(
+            "🧠", "Đố tên dây", "Nhớ tên 6 dây đàn",
+            trailing = {
+                TextButton(onClick = {
+                    soundOn = !soundOn
+                    prefs.edit().putBoolean("sound", soundOn).apply()
+                }) { Text(if (soundOn) "🔊" else "🔇", fontSize = 22.sp) }
+            }
+        )
 
         // Chọn mức tốc độ
         Row(

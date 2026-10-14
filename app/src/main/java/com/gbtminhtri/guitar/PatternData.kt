@@ -41,7 +41,8 @@ val patterns = listOf(
 
 /** Dây trầm (nốt gốc) của từng hợp âm cơ bản, dùng cho các mẫu rải. */
 val bassStrings = mapOf(
-    "Em" to 6, "Am" to 5, "C" to 5, "G" to 6, "D" to 4, "A" to 5, "E" to 6
+    "Em" to 6, "Am" to 5, "C" to 5, "G" to 6, "D" to 4, "A" to 5, "E" to 6,
+    "Dm" to 4, "F" to 6
 )
 
 /** Vòng hợp âm để tập đệm: mỗi ô nhịp (4 nhịp) đổi sang hợp âm kế tiếp. */

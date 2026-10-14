@@ -9,7 +9,7 @@ import kotlin.math.sin
 /**
  * Âm báo đúng/sai, tự tạo bằng code nên không cần thêm file âm thanh nào.
  * - Đúng: hai nốt "ting-ting" đi lên, nghe vui tai.
- * - Sai hoặc hết giờ: một tiếng "bzzt" trầm, đi xuống.
+ * - Sai hoặc hết giờ: hai nốt "bù-bùm" đi xuống (cao rồi thấp), nghe là biết ngay mình sai.
  */
 object SoundFx {
 
@@ -20,7 +20,8 @@ object SoundFx {
     }
 
     private val wrongSound: ShortArray by lazy {
-        makeBuzz(190.0, 140.0, 320, 0.40)
+        // Hai nốt đi xuống: ~G4 rồi ~C4, mỗi nốt trượt xuống nhẹ cho nghe "xìu"
+        makeBuzz(392.0, 370.0, 130, 0.40) + makeBuzz(262.0, 225.0, 300, 0.40)
     }
 
     fun playCorrect() = play(correctSound)

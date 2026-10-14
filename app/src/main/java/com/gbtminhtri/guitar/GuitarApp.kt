@@ -21,7 +21,7 @@ import androidx.navigation.compose.rememberNavController
 
 private data class Tab(val route: String, val label: String, val emoji: String)
 
-// Các tab hiện trên thanh dưới. Các màn hình "metronome", "strings", "tuner", "chordquiz", "ear" mở từ màn hình Hôm nay (và Hợp âm).
+// Các tab hiện trên thanh dưới. Các màn hình "metronome", "strings", "tuner", "chordquiz", "ear", "daily" mở từ màn hình Hôm nay (và Hợp âm).
 private val tabs = listOf(
     Tab("today", "Hôm nay", "🏠"),
     Tab("chords", "Hợp âm", "🎼"),
@@ -81,6 +81,7 @@ fun GuitarApp() {
             composable("strings") { StringQuizScreen() }
             composable("chordquiz") { ChordQuizScreen() }
             composable("ear") { EarTrainingScreen() }
+            composable("daily") { DailyChallengeScreen(onDone = { nav.goTo("today") }) }
             composable("tuner") { TunerScreen() }
             composable("chords") { ChordsScreen(onOpen = { route -> nav.goTo(route) }) }
             composable("practice") { DrillScreen() }

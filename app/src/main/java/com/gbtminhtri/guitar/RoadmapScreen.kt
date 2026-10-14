@@ -355,9 +355,14 @@ private fun ProgressHero(
                         color = Color.White
                     )
                     Text(
-                        "🔥 ${days.size} ngày đã tập",
+                        "🔥 ${DayStreak.currentStreak(days, now)} ngày liên tiếp",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.95f)
+                    )
+                    Text(
+                        "${days.size} ngày đã tập",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
                 }
             }

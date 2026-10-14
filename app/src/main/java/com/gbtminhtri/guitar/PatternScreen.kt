@@ -2,22 +2,25 @@ package com.gbtminhtri.guitar
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatternScreen() {
     val context = LocalContext.current
@@ -83,134 +86,150 @@ fun PatternScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Chế độ: 1 hợp âm hoặc vòng hợp âm
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Tập với", style = MaterialTheme.typography.labelLarge)
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = prog == null,
-                    onClick = { stopPlaying(); progression = null },
-                    label = { Text("1 hợp âm") }
+        ScreenHeader("🎸", "Quạt / Rải", "Luyện tay phải theo nhịp")
+
+        // Tập với 1 hợp âm hoặc cả vòng hợp âm
+        AppCard {
+            Text(
+                "Tập với",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            PillRow(
+                labels = listOf("1 hợp âm") + progressions.map { it.name },
+                selectedIndex = if (prog == null) 0 else progressions.indexOf(prog) + 1,
+                onSelect = { i ->
+                    stopPlaying()
+                    if (i == 0) {
+                        progression = null
+                    } else {
+                        bar = -1
+                        progression = progressions[i - 1]
+                    }
+                }
+            )
+
+            if (prog == null) {
+                ChordPillRow(chord, onSelect = { chord = it })
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Đang chơi",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(activeChord.name, fontSize = 56.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            "Tiếp theo: ${nextChord?.name}",
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                Text(
+                    "Mỗi ô nhịp (4 nhịp) đổi một hợp âm.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                progressions.forEach { p ->
-                    FilterChip(
-                        selected = prog == p,
-                        onClick = { stopPlaying(); bar = -1; progression = p },
-                        label = { Text(p.name) }
-                    )
-                }
             }
         }
 
-        if (prog == null) {
-            // Chọn 1 hợp âm
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                basicChords.forEach { c ->
-                    FilterChip(
-                        selected = c == chord,
-                        onClick = { chord = c },
-                        label = { Text(c.name) }
-                    )
-                }
-            }
-        } else {
-            Text(activeChord.name, fontSize = 56.sp)
+        // Chọn mẫu + mô tả
+        AppCard {
             Text(
-                "Tiếp theo: ${nextChord?.name}. Mỗi ô nhịp (4 nhịp) đổi một hợp âm.",
-                style = MaterialTheme.typography.bodyMedium
+                "Mẫu",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-
-        // Chọn mẫu
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Mẫu", style = MaterialTheme.typography.labelLarge)
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                patterns.forEach { p ->
-                    FilterChip(
-                        selected = p == pattern,
-                        onClick = {
-                            stopPlaying()
-                            pattern = p
-                            bpm = prefs.getInt("bpm_${p.name}", 60)
-                        },
-                        label = { Text(p.name) }
-                    )
+            PillRow(
+                labels = patterns.map { it.name },
+                selectedIndex = patterns.indexOf(pattern),
+                onSelect = { i ->
+                    stopPlaying()
+                    pattern = patterns[i]
+                    bpm = prefs.getInt("bpm_${patterns[i].name}", 60)
                 }
-            }
-        }
-
-        Text(pattern.description, style = MaterialTheme.typography.bodyMedium)
-        if (pattern.type == PatternType.PICK) {
-            Text(
-                "Số là dây số mấy (6 trầm nhất, 1 thanh nhất). Với hợp âm ${activeChord.name}, dây trầm là dây $bass.",
-                style = MaterialTheme.typography.bodyMedium
             )
+            Text(pattern.description, style = MaterialTheme.typography.bodyMedium)
+            if (pattern.type == PatternType.PICK) {
+                Text(
+                    "Số là dây số mấy (6 trầm nhất, 1 thanh nhất). Với hợp âm ${activeChord.name}, dây trầm là dây $bass.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         // Dãy ô sáng theo nhịp
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            pattern.labels.forEachIndexed { i, l ->
-                val active = playing && currentStep == i
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
+        AppCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                pattern.labels.forEachIndexed { i, l ->
+                    val active = playing && currentStep == i
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (active) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            labelFor(l),
+                            fontSize = 20.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            color = if (active) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                counts.forEach { c ->
                     Text(
-                        labelFor(l),
-                        fontSize = 20.sp,
-                        color = if (active) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        c,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            counts.forEach { c ->
-                Text(
-                    c,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+
+        // Tốc độ
+        AppCard {
+            BpmStepper(
+                bpm = bpm,
+                onMinus = { changeBpm(bpm - 5) },
+                onPlus = { changeBpm(bpm + 5) }
+            )
         }
 
-        // BPM
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            OutlinedButton(onClick = { changeBpm(bpm - 5) }) { Text("−") }
-            Text("$bpm BPM", style = MaterialTheme.typography.headlineMedium)
-            OutlinedButton(onClick = { changeBpm(bpm + 5) }) { Text("+") }
-        }
-
-        Button(
+        BigButton(
+            text = if (playing) "⏹  Dừng" else "▶  Bắt đầu",
+            container = if (playing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             onClick = {
                 if (playing) {
                     stopPlaying()
@@ -225,53 +244,75 @@ fun PatternScreen() {
                     metronome.start()
                     playing = true
                 }
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp)
-        ) { Text(if (playing) "Dừng" else "Bắt đầu") }
+            }
+        )
 
+        // Tự đánh giá sau mỗi lượt đủ dài
         val rating = pendingRating
         if (rating != null) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            AppCard {
+                Text(
+                    "Lượt vừa rồi: ${rating.first} ở ${rating.second} BPM. Bạn chơi sạch không?",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    "Sạch nghĩa là đều nhịp, không vấp, tiếng rõ. Hãy trả lời thật thà.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "Lượt vừa rồi: ${rating.first} ở ${rating.second} BPM. Bạn chơi sạch không?",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        "Sạch nghĩa là đều nhịp, không vấp, tiếng rõ. Hãy trả lời thật thà.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
+                    Button(
+                        onClick = {
                             repo.savePatternResult(
                                 DrillResult(System.currentTimeMillis(), rating.first, rating.second, 0, true)
                             )
                             pendingRating = null
-                        }) { Text("Sạch") }
-                        OutlinedButton(onClick = {
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("✅ Sạch") }
+                    OutlinedButton(
+                        onClick = {
                             repo.savePatternResult(
                                 DrillResult(System.currentTimeMillis(), rating.first, rating.second, 0, false)
                             )
                             pendingRating = null
-                        }) { Text("Chưa sạch") }
-                        TextButton(onClick = { pendingRating = null }) { Text("Bỏ qua") }
-                    }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Chưa sạch") }
+                    TextButton(onClick = { pendingRating = null }) { Text("Bỏ qua") }
                 }
             }
         }
 
-        Text(
-            "Mẹo: tập tay phải trước, bóp nhẹ các dây (chưa bấm hợp âm). Khi nhịp đã đều thì mới bấm hợp âm.",
-            style = MaterialTheme.typography.bodySmall
-        )
-
-        // Sơ đồ hợp âm để đối chiếu cách bấm
-        ChordDiagram(
-            chord = activeChord,
-            modifier = Modifier.fillMaxWidth(0.5f).aspectRatio(0.85f)
-        )
+        // Sơ đồ hợp âm để đối chiếu cách bấm + mẹo
+        AppCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ChordDiagram(
+                    chord = activeChord,
+                    modifier = Modifier
+                        .width(140.dp)
+                        .aspectRatio(0.85f)
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(activeChord.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "💡 Tập tay phải trước: bóp nhẹ các dây (chưa bấm hợp âm). Khi nhịp đã đều thì mới bấm hợp âm.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }

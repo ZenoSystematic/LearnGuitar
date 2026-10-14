@@ -40,14 +40,16 @@ private data class EarStage(
     val optionCount: Int,           // số đáp án để chọn
     val oppositeQuality: Boolean,   // true: đáp án sai luôn khác loại (trưởng/thứ) với đáp án đúng
     val limitMs: Long,              // thời gian cho mỗi câu
-    val replays: Int                // số lần được nghe lại (-1 = không giới hạn)
+    val replays: Int,               // số lần được nghe lại (-1 = không giới hạn)
+    val partners: Map<String, String>? = null // nếu có: đáp án sai luôn là hợp âm "bạn đồng hành" cố định
 )
 
 private val earStages = listOf(
     EarStage(
         "1 · Vui hay buồn",
-        "2 đáp án: một hợp âm trưởng (nghe sáng, vui) và một hợp âm thứ (nghe buồn, tối). Em, Am và Dm là hợp âm thứ.",
-        basicChords.map { it.name }, 2, true, 20_000L, -1
+        "Chỉ 2 cặp: C với Am, G với Em. Hợp âm trưởng (C, G) nghe sáng và vui, hợp âm thứ (Am, Em) nghe buồn và tối.",
+        listOf("C", "Am", "G", "Em"), 2, true, 20_000L, -1,
+        mapOf("C" to "Am", "Am" to "C", "G" to "Em", "Em" to "G")
     ),
     EarStage(
         "2 · Ba lựa chọn", "5 hợp âm, 3 đáp án, nghe lại thoải mái.",
@@ -75,7 +77,9 @@ private fun earCandidateItems(stage: EarStage): List<Int> =
 private fun buildEarQuestion(item: Int, stage: EarStage): EarQuestion {
     val target = basicChords[item]
     val pool = basicChords.filter { it.name in stage.poolNames && it.name != target.name }
-    val distractors: List<Chord> = if (stage.oppositeQuality) {
+    val distractors: List<Chord> = if (stage.partners != null) {
+        listOf(chordByName(stage.partners.getValue(target.name)))
+    } else if (stage.oppositeQuality) {
         val targetIsMinor = target.name in earMinorNames
         listOf(pool.filter { (it.name in earMinorNames) != targetIsMinor }.random())
     } else {
@@ -93,6 +97,7 @@ private fun buildEarQuestion(item: Int, stage: EarStage): EarQuestion {
 @Composable
 fun EarTrainingScreen() {
     val context = LocalContext.current
+    val haptics = rememberHaptics()
     val prefs = remember {
         context.applicationContext.getSharedPreferences("ear", Context.MODE_PRIVATE)
     }
@@ -158,6 +163,7 @@ fun EarTrainingScreen() {
                 prefs.edit().putInt("best_streak", best).apply()
             }
             if (timeMs <= EAR_FAST_MS) boxes[item] = minOf(4, boxes[item] + 1)
+            haptics.correct()
             if (streak >= EAR_GOAL_STREAK && stageIndex == unlocked && unlocked < earStages.size - 1) {
                 unlocked += 1
                 prefs.edit().putInt("unlocked", unlocked).apply()
@@ -166,6 +172,7 @@ fun EarTrainingScreen() {
         } else {
             streak = 0
             boxes[item] = maxOf(0, boxes[item] - 2)
+            haptics.wrong()
             if (soundOn) SoundFx.playWrong()
         }
         saveBoxes()
@@ -179,6 +186,7 @@ fun EarTrainingScreen() {
         streak = 0
         val item = question.item
         boxes[item] = maxOf(0, boxes[item] - 2)
+        haptics.wrong()
         if (soundOn) SoundFx.playWrong()
         saveBoxes()
     }
@@ -228,17 +236,15 @@ fun EarTrainingScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Luyện tai",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = {
-                soundOn = !soundOn
-                prefs.edit().putBoolean("sound", soundOn).apply()
-            }) { Text(if (soundOn) "🔔 Âm báo sai: bật" else "🔕 Âm báo sai: tắt") }
-        }
+        ScreenHeader(
+            "👂", "Luyện tai", "Nghe và nhận ra hợp âm",
+            trailing = {
+                TextButton(onClick = {
+                    soundOn = !soundOn
+                    prefs.edit().putBoolean("sound", soundOn).apply()
+                }) { Text(if (soundOn) "🔔" else "🔕", fontSize = 22.sp) }
+            }
+        )
 
         // Chọn mức độ (mức chưa mở khóa thì bị khóa)
         Row(

@@ -68,6 +68,11 @@ object ProgressReset {
         prefs(context, "today").edit().remove("days").apply()
     }
 
+    /** Thử thách hàng ngày: điểm cao nhất và ngày đã làm. */
+    fun resetDailyChallenge(context: Context) {
+        prefs(context, "daily").edit().clear().apply()
+    }
+
     /** Các mục đã tick tay trong lộ trình (mục tự tick sẽ mất khi dữ liệu gốc bị xóa). */
     fun resetRoadmapTicks(context: Context) {
         prefs(context, "roadmap").edit().remove("done").apply()
@@ -111,6 +116,11 @@ private val resetOptions = listOf(
         "days", "Ngày đã tập",
         "Số ngày tập và chuỗi ngày ở màn hình Hôm nay.",
         ProgressReset::resetPracticeDays
+    ),
+    ResetOption(
+        "daily", "Thử thách hàng ngày",
+        "Điểm cao nhất và ngày đã làm thử thách (chuỗi ngày nằm ở mục Ngày đã tập).",
+        ProgressReset::resetDailyChallenge
     ),
     ResetOption(
         "roadmap", "Mục tick tay trong lộ trình",

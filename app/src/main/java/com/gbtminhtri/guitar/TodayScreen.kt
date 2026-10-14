@@ -287,6 +287,8 @@ fun TodayScreen(onOpen: (String) -> Unit) {
             else -> {
                 HeroCard(now, daysThisWeek, practicedToday, days, dayFormat)
 
+                DailyChallengeCard(onOpen)
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = !SessionStore.short,
@@ -417,7 +419,8 @@ private fun HeroCard(
             }
 
             Text(
-                "Tuần này: $daysThisWeek/7 ngày. Nghỉ một ngày cũng không sao, quay lại là được.",
+                "🔥 Chuỗi ${DayStreak.currentStreak(days, now)} ngày · Tuần này $daysThisWeek/7. " +
+                        "Nghỉ một ngày cũng không sao, quay lại là được.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.9f)
             )
@@ -511,5 +514,49 @@ private fun TimerRing(fraction: Float, emoji: String, timeText: String) {
             Text(emoji, fontSize = 36.sp)
             Text(timeText, fontSize = 48.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+/** Thẻ mời làm Thử thách hôm nay: hiện chuỗi ngày hoặc điểm nếu đã làm xong. */
+@Composable
+private fun DailyChallengeCard(onOpen: (String) -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { context.applicationContext.getSharedPreferences("daily", Context.MODE_PRIVATE) }
+    val doneToday = remember { prefs.getString("done_date", "") == DayStreak.todayKey() }
+    val score = remember { prefs.getInt("score", 0) }
+    val streak = remember { DayStreak.currentStreak(DayStreak.days(context)) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable { onOpen("daily") }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+            contentAlignment = Alignment.Center
+        ) { Text(if (doneToday) "✅" else "🏆", fontSize = 26.sp) }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Thử thách hôm nay",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                if (doneToday) "Đã xong $score/10 · chuỗi 🔥 $streak ngày"
+                else "10 câu, khoảng 3 phút · giữ chuỗi 🔥 $streak ngày",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+            )
+        }
+        Text("›", fontSize = 28.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }

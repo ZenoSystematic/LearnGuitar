@@ -98,6 +98,7 @@ private fun buildChordQuestion(item: Int, stage: ChordQuizStage): ChordQuestion 
 @Composable
 fun ChordQuizScreen() {
     val context = LocalContext.current
+    val haptics = rememberHaptics()
     val prefs = remember {
         context.applicationContext.getSharedPreferences("chordquiz", Context.MODE_PRIVATE)
     }
@@ -163,6 +164,7 @@ fun ChordQuizScreen() {
             }
             // Chỉ tăng mức thuộc khi trả lời đúng VÀ nhanh
             if (timeMs <= QUIZ_FAST_MS) boxes[item] = minOf(4, boxes[item] + 1)
+            haptics.correct()
             // Đúng thì hợp âm đó vang lên
             if (soundOn) ChordSound.play(question.target)
             // Đủ chuỗi đúng ở mức cao nhất đang mở thì mở khóa mức tiếp theo
@@ -174,6 +176,7 @@ fun ChordQuizScreen() {
         } else {
             streak = 0
             boxes[item] = maxOf(0, boxes[item] - 2)
+            haptics.wrong()
             if (soundOn) SoundFx.playWrong()
         }
         saveBoxes()
@@ -187,6 +190,7 @@ fun ChordQuizScreen() {
         streak = 0
         val item = question.item
         boxes[item] = maxOf(0, boxes[item] - 2)
+        haptics.wrong()
         if (soundOn) SoundFx.playWrong()
         saveBoxes()
     }
@@ -230,17 +234,15 @@ fun ChordQuizScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Quiz hợp âm",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = {
-                soundOn = !soundOn
-                prefs.edit().putBoolean("sound", soundOn).apply()
-            }) { Text(if (soundOn) "🔊 Bật tiếng" else "🔇 Tắt tiếng") }
-        }
+        ScreenHeader(
+            "📝", "Quiz hợp âm", "Nhìn hình, chọn đúng hợp âm",
+            trailing = {
+                TextButton(onClick = {
+                    soundOn = !soundOn
+                    prefs.edit().putBoolean("sound", soundOn).apply()
+                }) { Text(if (soundOn) "🔊" else "🔇", fontSize = 22.sp) }
+            }
+        )
 
         // Chọn mức độ (mức chưa mở khóa thì bị khóa)
         Row(
