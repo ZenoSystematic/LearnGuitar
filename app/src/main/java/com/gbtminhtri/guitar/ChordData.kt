@@ -18,5 +18,10 @@ val basicChords = listOf(
     Chord("G", listOf(3, 2, 0, 0, 0, 3), listOf(2, 1, 0, 0, 0, 3)),
     Chord("D", listOf(-1, -1, 0, 2, 3, 2), listOf(0, 0, 0, 1, 3, 2)),
     Chord("A", listOf(-1, 0, 2, 2, 2, 0), listOf(0, 0, 1, 2, 3, 0)),
-    Chord("E", listOf(0, 2, 2, 1, 0, 0), listOf(0, 2, 3, 1, 0, 0))
+    Chord("E", listOf(0, 2, 2, 1, 0, 0), listOf(0, 2, 3, 1, 0, 0)),
+    Chord("Dm", listOf(-1, -1, 0, 2, 3, 1), listOf(0, 0, 0, 2, 3, 1)),
+    // F đầy đủ (barre): ngón 1 ấn ngang cả 6 dây ở phím 1.
+    // Muốn dùng F rút gọn 4 dây (dễ hơn cho người mới), đổi thành:
+    //   Chord("F", listOf(-1, -1, 3, 2, 1, 1), listOf(0, 0, 3, 2, 1, 1))
+    Chord("F", listOf(1, 3, 3, 2, 1, 1), listOf(1, 3, 4, 2, 1, 1))
 )

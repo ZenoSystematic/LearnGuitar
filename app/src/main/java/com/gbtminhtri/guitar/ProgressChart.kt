@@ -5,6 +5,11 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -103,6 +108,21 @@ fun ProgressChart(results: List<DrillResult>, modifier: Modifier = Modifier) {
 
 private fun pairLabel(pair: String) = pair.replace("-", " ↔ ")
 
+/** Ô số liệu nhỏ dưới biểu đồ. */
+@Composable
+private fun StatPill(emoji: String, value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("$emoji $value", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressSection() {
@@ -123,63 +143,36 @@ fun ProgressSection() {
         else -> null
     }
     var selectedKey by remember { mutableStateOf(initial) }
-
-    // Số ngày đã tập (từ màn hình Hôm nay)
-    val daysDone = remember {
-        context.applicationContext
-            .getSharedPreferences("today", Context.MODE_PRIVATE)
-            .getStringSet("days", emptySet())!!
-            .toSet()
-    }
-    val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
-    val daysThisWeek = remember {
-        val now = System.currentTimeMillis()
-        (0..6).count { d -> dayFormat.format(Date(now - d * 86_400_000L)) in daysDone }
-    }
-
     val sel = selectedKey
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Tiến bộ", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Buổi tập: $daysThisWeek/7 ngày trong tuần này, tổng cộng ${daysDone.size} ngày.",
-            style = MaterialTheme.typography.bodyMedium
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("📈 Biểu đồ BPM", style = MaterialTheme.typography.titleMedium)
 
         if (sel == null) {
             Text(
-                "Chưa có dữ liệu. Làm một lượt ở tab Luyện tập, hoặc tập quạt/rải đủ 20 giây rồi ghi nhận kết quả, để biểu đồ bắt đầu.",
-                style = MaterialTheme.typography.bodyMedium
+                "Chưa có dữ liệu. Tập một lượt ở tab Luyện tập hoặc Quạt/Rải để biểu đồ xuất hiện.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            if (drillPairs.isNotEmpty()) {
-                Text("Chuyển hợp âm", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    drillPairs.forEach { p ->
-                        FilterChip(
-                            selected = sel == "c:$p",
-                            onClick = { selectedKey = "c:$p" },
-                            label = { Text(pairLabel(p)) }
-                        )
-                    }
+            // Một hàng chọn duy nhất: 🔁 = chuyển hợp âm, 🎸 = quạt/rải
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                drillPairs.forEach { p ->
+                    FilterChip(
+                        selected = sel == "c:$p",
+                        onClick = { selectedKey = "c:$p" },
+                        label = { Text("🔁 " + pairLabel(p)) }
+                    )
                 }
-            }
-            if (patternKeys.isNotEmpty()) {
-                Text("Quạt / Rải", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    patternKeys.forEach { k ->
-                        FilterChip(
-                            selected = sel == "p:$k",
-                            onClick = { selectedKey = "p:$k" },
-                            label = { Text(k) }
-                        )
-                    }
+                patternKeys.forEach { k ->
+                    FilterChip(
+                        selected = sel == "p:$k",
+                        onClick = { selectedKey = "p:$k" },
+                        label = { Text("🎸 $k") }
+                    )
                 }
             }
 
@@ -192,30 +185,25 @@ fun ProgressSection() {
                 results = results.takeLast(20),
                 modifier = Modifier.fillMaxWidth().height(180.dp)
             )
-            Text(
-                "● đạt / sạch   ○ chưa đạt   — BPM sạch cao nhất (20 lượt gần nhất)",
-                style = MaterialTheme.typography.bodySmall
-            )
 
             val passedList = results.filter { it.passed }
             val firstPassed = passedList.firstOrNull()?.bpm
             val bestPassed = passedList.maxOfOrNull { it.bpm }
-            Text(
-                "${results.size} lượt tập, ${passedList.size} lượt đạt.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            if (firstPassed != null && bestPassed != null) {
+            val bpmGain = if (firstPassed != null && bestPassed != null) {
                 val diff = bestPassed - firstPassed
-                Text(
-                    "BPM sạch: từ $firstPassed lên $bestPassed (${if (diff >= 0) "+" else ""}$diff BPM).",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                Text(
-                    "Chưa có lượt nào đạt. Giữ nhịp chậm lại một chút và thử lại nhé.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                if (diff >= 0) "+$diff" else "$diff"
+            } else "—"
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatPill("🎯", "${results.size}", "lượt tập", Modifier.weight(1f))
+                StatPill("✅", "${passedList.size}", "lượt đạt", Modifier.weight(1f))
+                StatPill("⚡", bpmGain, "BPM tăng", Modifier.weight(1f))
             }
+            Text(
+                "● đạt   ○ chưa đạt   — BPM sạch cao nhất",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

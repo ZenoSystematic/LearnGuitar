@@ -56,6 +56,7 @@ private val sessionSteps = listOf(
         "Hợp âm sạch", 3, 2,
         "Bấm từng hợp âm bạn đang học, gảy từng dây một và nghe xem dây nào bị tịt hoặc rè.",
         "chords", "Mở Hợp âm",
+        "chordquiz", "Quiz hợp âm",
         emoji = "🎼"
     ),
     SessionStep(
@@ -325,6 +326,11 @@ fun TodayScreen(onOpen: (String) -> Unit) {
                     ToolCard("🎚️", "Tuner", Modifier.weight(1f)) { onOpen("tuner") }
                     ToolCard("🧠", "Đố tên dây", Modifier.weight(1f)) { onOpen("strings") }
                     ToolCard("⏱️", "Metronome", Modifier.weight(1f)) { onOpen("metronome") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ToolCard("📝", "Quiz hợp âm", Modifier.weight(1f)) { onOpen("chordquiz") }
+                    ToolCard("👂", "Luyện tai", Modifier.weight(1f)) { onOpen("ear") }
+                    Spacer(Modifier.weight(1f))
                 }
             }
         }

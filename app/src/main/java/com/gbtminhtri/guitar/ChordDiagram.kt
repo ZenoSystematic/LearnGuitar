@@ -5,7 +5,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -56,6 +58,26 @@ fun ChordDiagram(chord: Chord, modifier: Modifier = Modifier) {
             isFakeBoldText = true
         }
 
+        // Barre: một ngón ấn ngang nhiều dây ở cùng một phím (ví dụ hợp âm F) -> vẽ một thanh thay vì nhiều chấm
+        val barreStrings: List<Int> = chord.frets.indices
+            .filter { chord.fingers[it] > 0 && chord.frets[it] > 0 }
+            .groupBy { chord.fingers[it] * 10 + chord.frets[it] }
+            .values.firstOrNull { it.size >= 2 } ?: emptyList()
+        if (barreStrings.isNotEmpty()) {
+            val xl = left + barreStrings.first() * stringGap
+            val xr = left + barreStrings.last() * stringGap
+            val by = top + (chord.frets[barreStrings.first()] - 0.5f) * fretGap
+            drawRoundRect(
+                color = dotColor,
+                topLeft = Offset(xl - dotRadius, by - dotRadius),
+                size = Size(xr - xl + 2 * dotRadius, 2 * dotRadius),
+                cornerRadius = CornerRadius(dotRadius, dotRadius)
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                chord.fingers[barreStrings.first()].toString(), xl, by + paint.textSize / 3f, paint
+            )
+        }
+
         chord.frets.forEachIndexed { s, fret ->
             val x = left + s * stringGap
             when {
@@ -67,6 +89,7 @@ fun ChordDiagram(chord: Chord, modifier: Modifier = Modifier) {
                 fret == 0 -> { // vòng tròn rỗng: dây buông
                     drawCircle(lineColor, radius = dotRadius * 0.7f, center = Offset(x, markerY), style = Stroke(width = 4f))
                 }
+                s in barreStrings -> {} // đã vẽ thành thanh barre ở trên
                 else -> { // chấm tròn: vị trí bấm, kèm số ngón tay
                     val y = top + (fret - 0.5f) * fretGap
                     drawCircle(dotColor, radius = dotRadius, center = Offset(x, y))

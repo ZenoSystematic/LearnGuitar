@@ -1,8 +1,15 @@
 package com.gbtminhtri.guitar
 
 import android.content.Context
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -10,8 +17,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * drillPair + drillBpm: nếu có, mục này tự động tick khi bài tập chuyển hợp âm
@@ -55,6 +77,16 @@ private val roadmap = listOf(
         "Cấp 3: Mở rộng",
         listOf(
             RoadmapItem("cgd", "C, G, D sạch", "Mỗi hợp âm gảy từng dây đều kêu rõ."),
+            RoadmapItem("dm", "Dm sạch", "Không gảy dây 6 và 5, 4 dây còn lại kêu rõ."),
+            RoadmapItem("f", "F sạch (thế barre)", "Ngón trỏ ấn ngang cả 6 dây ở phím 1, các dây đều kêu. Hợp âm khó, cứ kiên nhẫn nhé."),
+            RoadmapItem(
+                "chordquiz", "Thuộc hình và tên ${basicChords.size} hợp âm",
+                "Mục Quiz hợp âm: đạt mức \"đã thuộc\" ở cả hai chiều (tự tick)."
+            ),
+            RoadmapItem(
+                "ear", "Nghe và nhận ra ${basicChords.size} hợp âm",
+                "Mục Luyện tai: đạt mức \"đã thuộc\" cho tất cả hợp âm (tự tick)."
+            ),
             RoadmapItem(
                 "g-c", "Chuyển G ↔ C đạt 60 BPM",
                 "Tab Luyện tập: không quá 2 lỗi trong 60 giây.", "C-G", 60
@@ -73,8 +105,39 @@ private val roadmap = listOf(
     )
 )
 
+private val progressHeroGradient = Brush.linearGradient(listOf(Color(0xFFFF9A3C), Color(0xFFD9541E)))
+private val levelEmojis = listOf("🌱", "🎼", "🚀", "🎸")
+
+/** Độ thuộc (0..1) của một bài quiz, tính từ các "mức thuộc" đã lưu. */
+private fun masteryFraction(context: Context, prefsName: String, size: Int): Float {
+    val saved = context.applicationContext
+        .getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+        .getString("boxes", null)
+    return parseQuizBoxes(saved, size).sum() / (size * 4f)
+}
+
+/** Giá trị chạy mượt từ 0 lên mục tiêu khi màn hình hiện ra. */
+@Composable
+private fun rememberAnimatedFraction(target: Float): Float {
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { started = true }
+    val value by animateFloatAsState(
+        targetValue = if (started) target.coerceIn(0f, 1f) else 0f,
+        animationSpec = tween(900),
+        label = "fraction"
+    )
+    return value
+}
+
 @Composable
 fun RoadmapScreen() {
+    // Mỗi lần đặt lại tiến bộ, dựng lại cả màn hình để số liệu và biểu đồ cập nhật ngay
+    var version by remember { mutableIntStateOf(0) }
+    key(version) { RoadmapContent(onProgressReset = { version++ }) }
+}
+
+@Composable
+private fun RoadmapContent(onProgressReset: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember {
         context.applicationContext.getSharedPreferences("roadmap", Context.MODE_PRIVATE)
@@ -90,49 +153,369 @@ fun RoadmapScreen() {
         val quizMastered = context.applicationContext
             .getSharedPreferences("strings", Context.MODE_PRIVATE)
             .getBoolean("mastered", false)
-        if (quizMastered) fromDrill + "strings" else fromDrill
+        val chordQuizMastered = context.applicationContext
+            .getSharedPreferences("chordquiz", Context.MODE_PRIVATE)
+            .getBoolean("mastered", false)
+        val earMastered = context.applicationContext
+            .getSharedPreferences("ear", Context.MODE_PRIVATE)
+            .getBoolean("mastered", false)
+        var result: Set<String> = fromDrill
+        if (quizMastered) result = result + "strings"
+        if (chordQuizMastered) result = result + "chordquiz"
+        if (earMastered) result = result + "ear"
+        result
     }
 
     val allItems = roadmap.flatMap { it.items }
     val doneCount = allItems.count { it.id in ticked || it.id in autoDone }
+    val fraction = if (allItems.isEmpty()) 0f else doneCount / allItems.size.toFloat()
+
+    // Ngày đã tập (từ màn hình Hôm nay)
+    val daysDone = remember {
+        context.applicationContext
+            .getSharedPreferences("today", Context.MODE_PRIVATE)
+            .getStringSet("days", emptySet())!!
+            .toSet()
+    }
+    val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+    val now = remember { System.currentTimeMillis() }
+
+    // Độ thuộc của ba bài quiz
+    val stringsMastery = remember { masteryFraction(context, "strings", 12) }
+    val chordMastery = remember { masteryFraction(context, "chordquiz", 2 * basicChords.size) }
+    val earMastery = remember { masteryFraction(context, "ear", basicChords.size) }
+
+    // Mặc định chỉ mở cấp đang làm dở, các cấp khác thu gọn cho đỡ rối mắt
+    var expandedLevels by remember {
+        mutableStateOf(
+            setOf(
+                roadmap.indexOfFirst { lvl -> lvl.items.any { it.id !in ticked && it.id !in autoDone } }
+                    .coerceAtLeast(0)
+            )
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        ProgressSection()
-        Spacer(Modifier.height(16.dp))
-        Text("Lộ trình của mình", style = MaterialTheme.typography.headlineSmall)
-        Text("Đã xong $doneCount/${allItems.size} mục", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Chỉ tick khi thật sự làm được, đừng tick cho đủ. Các mục chuyển hợp âm tự tick từ tab Luyện tập.",
-            style = MaterialTheme.typography.bodySmall
+        ProgressHero(
+            fraction = fraction,
+            doneCount = doneCount,
+            total = allItems.size,
+            now = now,
+            days = daysDone,
+            dayFormat = dayFormat
         )
 
-        roadmap.forEach { level ->
-            Spacer(Modifier.height(8.dp))
-            Text(level.title, style = MaterialTheme.typography.titleLarge)
-            level.items.forEach { item ->
-                val auto = item.id in autoDone
-                val checked = auto || item.id in ticked
-                Row(verticalAlignment = Alignment.Top) {
-                    Checkbox(
-                        checked = checked,
-                        enabled = !auto,
-                        onCheckedChange = { isChecked ->
-                            ticked = if (isChecked) ticked + item.id else ticked - item.id
-                            prefs.edit().putStringSet("done", ticked.toSet()).apply()
-                        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MasteryTile("🎼", "Hợp âm", chordMastery, Modifier.weight(1f))
+            MasteryTile("👂", "Luyện tai", earMastery, Modifier.weight(1f))
+            MasteryTile("🧠", "Tên dây", stringsMastery, Modifier.weight(1f))
+        }
+
+        // Biểu đồ
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(16.dp)
+        ) {
+            ProgressSection()
+        }
+
+        // Lộ trình
+        Column {
+            Text("Lộ trình", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Chạm vào mục để xem chi tiết  ·  ⚡ = tự tick",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        roadmap.forEachIndexed { index, level ->
+            LevelCard(
+                emoji = levelEmojis.getOrElse(index) { "⭐" },
+                level = level,
+                expanded = index in expandedLevels,
+                onToggle = {
+                    expandedLevels =
+                        if (index in expandedLevels) expandedLevels - index else expandedLevels + index
+                },
+                isAuto = { it.id in autoDone },
+                isChecked = { it.id in autoDone || it.id in ticked },
+                onCheck = { item, isChecked ->
+                    ticked = if (isChecked) ticked + item.id else ticked - item.id
+                    prefs.edit().putStringSet("done", ticked.toSet()).apply()
+                }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        ResetProgressSection(onDone = onProgressReset)
+    }
+}
+
+/** Vòng tròn tiến độ vẽ bằng Canvas. */
+@Composable
+private fun ProgressRing(
+    fraction: Float,
+    ringSize: Dp,
+    strokeWidth: Dp,
+    ringColor: Color,
+    trackColor: Color,
+    content: @Composable () -> Unit
+) {
+    Box(modifier = Modifier.size(ringSize), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = strokeWidth.toPx()
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            val topLeft = Offset(stroke / 2f, stroke / 2f)
+            drawArc(
+                color = trackColor,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round)
+            )
+            if (fraction > 0f) {
+                drawArc(
+                    color = ringColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * fraction,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                )
+            }
+        }
+        content()
+    }
+}
+
+/** Thẻ lớn ở đầu trang: vòng % hoàn thành lộ trình + 7 ngày gần nhất. */
+@Composable
+private fun ProgressHero(
+    fraction: Float,
+    doneCount: Int,
+    total: Int,
+    now: Long,
+    days: Set<String>,
+    dayFormat: SimpleDateFormat
+) {
+    val animated = rememberAnimatedFraction(fraction)
+    val dayNames = arrayOf("CN", "T2", "T3", "T4", "T5", "T6", "T7")
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(progressHeroGradient)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                ProgressRing(
+                    fraction = animated,
+                    ringSize = 104.dp,
+                    strokeWidth = 11.dp,
+                    ringColor = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.28f)
+                ) {
+                    Text(
+                        "${(animated * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
-                    Column(modifier = Modifier.padding(top = 12.dp)) {
-                        Text(item.title, style = MaterialTheme.typography.bodyLarge)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "Lộ trình",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                    Text(
+                        "$doneCount/$total mục",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        "🔥 ${days.size} ngày đã tập",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.95f)
+                    )
+                }
+            }
+
+            // 7 ngày gần nhất, hôm nay nằm ngoài cùng bên phải
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                for (offset in 6 downTo 0) {
+                    val time = now - offset * 86_400_000L
+                    val done = dayFormat.format(Date(time)) in days
+                    val cal = Calendar.getInstance().apply { timeInMillis = time }
+                    val label = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(if (done) Color.White else Color.White.copy(alpha = 0.25f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (done) Text("✓", color = Color(0xFFD9541E), fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
                         Text(
-                            item.detail + if (auto) " (tự động tick)" else "",
-                            style = MaterialTheme.typography.bodySmall
+                            label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = if (offset == 0) 1f else 0.75f),
+                            fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Normal
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Ô nhỏ hiện độ thuộc của một bài quiz bằng vòng tròn. */
+@Composable
+private fun MasteryTile(emoji: String, label: String, fraction: Float, modifier: Modifier = Modifier) {
+    val animated = rememberAnimatedFraction(fraction)
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(vertical = 14.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ProgressRing(
+            fraction = animated,
+            ringSize = 68.dp,
+            strokeWidth = 8.dp,
+            ringColor = MaterialTheme.colorScheme.tertiary,
+            trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+        ) {
+            Text(
+                "${(animated * 100).roundToInt()}%",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text("$emoji $label", style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** Một cấp của lộ trình: bấm vào tiêu đề để mở/thu gọn danh sách mục. */
+@Composable
+private fun LevelCard(
+    emoji: String,
+    level: RoadmapLevel,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    isAuto: (RoadmapItem) -> Boolean,
+    isChecked: (RoadmapItem) -> Boolean,
+    onCheck: (RoadmapItem, Boolean) -> Unit
+) {
+    val done = level.items.count { isChecked(it) }
+    val total = level.items.size
+    val complete = total > 0 && done == total
+    val animated = rememberAnimatedFraction(if (total == 0) 0f else done / total.toFloat())
+    var openItem by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggle() }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(emoji, fontSize = 28.sp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(level.title, style = MaterialTheme.typography.titleMedium)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animated)
+                            .fillMaxHeight()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiary)
+                    )
+                }
+            }
+            Text(
+                if (complete) "🎉" else "$done/$total",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (complete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(if (expanded) "▾" else "▸", style = MaterialTheme.typography.titleMedium)
+        }
+
+        if (expanded) {
+            Column(modifier = Modifier.padding(start = 8.dp, end = 16.dp, bottom = 12.dp)) {
+                level.items.forEach { item ->
+                    val auto = isAuto(item)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { openItem = if (openItem == item.id) null else item.id },
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Checkbox(
+                            checked = isChecked(item),
+                            enabled = !auto,
+                            onCheckedChange = { onCheck(item, it) }
+                        )
+                        Column(modifier = Modifier.weight(1f).padding(top = 12.dp, bottom = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    item.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                if (auto) Text("  ⚡", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            if (openItem == item.id) {
+                                Text(
+                                    item.detail,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

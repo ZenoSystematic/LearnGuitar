@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -20,7 +21,7 @@ import androidx.navigation.compose.rememberNavController
 
 private data class Tab(val route: String, val label: String, val emoji: String)
 
-// Các tab hiện trên thanh dưới. Các màn hình "metronome", "strings", "tuner" mở từ màn hình Hôm nay.
+// Các tab hiện trên thanh dưới. Các màn hình "metronome", "strings", "tuner", "chordquiz", "ear" mở từ màn hình Hôm nay (và Hợp âm).
 private val tabs = listOf(
     Tab("today", "Hôm nay", "🏠"),
     Tab("chords", "Hợp âm", "🎼"),
@@ -40,6 +41,7 @@ private fun NavHostController.goTo(route: String) {
 @Composable
 fun GuitarApp() {
     val nav = rememberNavController()
+    ChordSound.init(LocalContext.current) // để ChordSound tìm được file ghi âm trong res/raw
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
 
@@ -77,8 +79,10 @@ fun GuitarApp() {
             composable("today") { TodayScreen(onOpen = { route -> nav.goTo(route) }) }
             composable("metronome") { MetronomeScreen() }
             composable("strings") { StringQuizScreen() }
+            composable("chordquiz") { ChordQuizScreen() }
+            composable("ear") { EarTrainingScreen() }
             composable("tuner") { TunerScreen() }
-            composable("chords") { ChordsScreen() }
+            composable("chords") { ChordsScreen(onOpen = { route -> nav.goTo(route) }) }
             composable("practice") { DrillScreen() }
             composable("pattern") { PatternScreen() }
             composable("roadmap") { RoadmapScreen() }
