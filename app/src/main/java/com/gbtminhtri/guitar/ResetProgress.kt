@@ -34,7 +34,7 @@ object ProgressReset {
         val e = p.edit()
         e.remove("history")
         p.all.keys
-            .filter { it.startsWith("bpm_") || it.startsWith("passes_") }
+            .filter { it.startsWith("bpm_") || it.startsWith("passes_") || it.startsWith("best_") }
             .forEach { e.remove(it) }
         e.apply()
     }

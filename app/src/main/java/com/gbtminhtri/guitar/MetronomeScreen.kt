@@ -66,6 +66,12 @@ fun MetronomeScreen() {
     DisposableEffect(Unit) {
         onDispose { metronome.stop() }
     }
+    // Bấm Home hoặc khóa máy thì cũng dừng nhịp
+    StopWhenBackgrounded {
+        metronome.stop()
+        playing = false
+        currentBeat = -1
+    }
 
     fun setBpm(value: Int) {
         bpm = value.coerceIn(40, 200)

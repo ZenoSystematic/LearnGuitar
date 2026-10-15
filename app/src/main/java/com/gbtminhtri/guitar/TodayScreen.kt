@@ -106,10 +106,11 @@ fun TodayScreen(onOpen: (String) -> Unit) {
     }
     val repo = remember { DrillRepository(context.applicationContext) }
 
-    // Làm mới đồng hồ mỗi nửa giây
+    // Chỉ làm mới đồng hồ mỗi nửa giây khi buổi tập đang chạy. Lúc nghỉ không cần, đỡ vẽ lại cả màn hình vô ích.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
+    LaunchedEffect(SessionStore.running) {
+        now = System.currentTimeMillis()
+        while (SessionStore.running) {
             delay(500)
             now = System.currentTimeMillis()
         }
@@ -119,7 +120,7 @@ fun TodayScreen(onOpen: (String) -> Unit) {
     val dayFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
     var days by remember { mutableStateOf(prefs.getStringSet("days", emptySet())!!.toSet()) }
     val daysThisWeek = (0..6).count { d ->
-        dayFormat.format(Date(now - d * 86_400_000L)) in days
+        dayFormat.format(Date(DayStreak.daysAgo(now, d))) in days
     }
     val practicedToday = dayFormat.format(Date(now)) in days
 
@@ -389,7 +390,7 @@ private fun HeroCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 for (offset in 6 downTo 0) {
-                    val time = now - offset * 86_400_000L
+                    val time = DayStreak.daysAgo(now, offset)
                     val done = dayFormat.format(Date(time)) in days
                     val cal = Calendar.getInstance().apply { timeInMillis = time }
                     val label = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]

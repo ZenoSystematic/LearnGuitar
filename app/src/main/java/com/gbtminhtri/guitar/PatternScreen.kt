@@ -58,6 +58,8 @@ fun PatternScreen() {
         currentStep = -1
     }
 
+    StopWhenBackgrounded { if (playing) stopPlaying() }
+
     fun changeBpm(newBpm: Int) {
         bpm = newBpm.coerceIn(40, 160)
         metronome.bpm = bpm

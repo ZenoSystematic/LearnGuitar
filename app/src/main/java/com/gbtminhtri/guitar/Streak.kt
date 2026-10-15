@@ -26,6 +26,13 @@ object DayStreak {
         prefs.edit().putStringSet("days", updated).apply()
     }
 
+    /** Thời điểm cách `now` đúng n ngày lịch (đúng cả khi đổi giờ hoặc múi giờ, khác với trừ 86_400_000ms). */
+    fun daysAgo(now: Long, n: Int): Long {
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        cal.add(Calendar.DAY_OF_YEAR, -n)
+        return cal.timeInMillis
+    }
+
     /**
      * Số ngày liên tiếp đã tập tính đến hôm nay.
      * Nếu hôm nay chưa tập mà hôm qua có tập thì chuỗi vẫn còn nguyên (chỉ đứt khi qua hết hôm nay mà vẫn chưa tập).

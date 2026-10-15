@@ -23,15 +23,21 @@ class Metronome(
     @Volatile var bpm: Int = 80
     @Volatile var beatsPerBar: Int = 4
     @Volatile var stepsPerBeat: Int = 1
-    @Volatile private var running = false
-    private var thread: Thread? = null
+    // Mỗi lần start() là một "phiên" riêng. Bấm Dừng rồi Bắt đầu lại thật nhanh thì luồng cũ chỉ nhìn
+    // cờ của phiên cũ (đã tắt) nên tự thoát, không bao giờ có hai luồng cùng phát (nhịp chạy đôi).
+    private class Session {
+        @Volatile var active = true
+    }
 
-    val isRunning: Boolean get() = running
+    private var session: Session? = null
+
+    val isRunning: Boolean get() = session?.active == true
 
     fun start() {
-        if (running) return
-        running = true
-        thread = Thread {
+        if (isRunning) return
+        val current = Session()
+        session = current
+        Thread {
             val minBuf = AudioTrack.getMinBufferSize(
                 sampleRate,
                 AudioFormat.CHANNEL_OUT_MONO,
@@ -57,7 +63,7 @@ class Metronome(
 
             track.play()
             var step = 0
-            while (running) {
+            while (current.active) {
                 val spb = stepsPerBeat
                 val total = beatsPerBar * spb
                 step %= total
@@ -69,14 +75,15 @@ class Metronome(
                 track.write(buffer, 0, buffer.size) // blocks tới khi đủ chỗ -> nhịp đều
                 step += 1
             }
-            track.stop()
+            track.pause()
+            track.flush() // cắt ngay tiếng click còn trong bộ đệm
             track.release()
-        }.also { it.start() }
+        }.start()
     }
 
     fun stop() {
-        running = false
-        thread = null
+        session?.active = false
+        session = null
     }
 
     /** Tiếng click ngắn + im lặng cho đủ độ dài bước. Nhịp chính to hơn, nhịp phụ nhỏ hơn. */

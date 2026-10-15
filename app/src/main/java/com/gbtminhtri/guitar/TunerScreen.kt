@@ -86,6 +86,14 @@ fun TunerScreen() {
     val smoother = remember { Smoother() }
     val engine = remember { TunerEngine { f -> frequency = smoother.push(f) } }
     DisposableEffect(Unit) { onDispose { engine.stop() } }
+    // Xuống nền thì nhả micro; quay lại bấm "Bắt đầu nghe" để nghe tiếp
+    StopWhenBackgrounded {
+        if (listening) {
+            engine.stop()
+            listening = false
+            frequency = null
+        }
+    }
 
     // Vào màn hình thì xin quyền micro (nếu chưa có), có quyền thì tự bắt đầu nghe
     LaunchedEffect(Unit) {

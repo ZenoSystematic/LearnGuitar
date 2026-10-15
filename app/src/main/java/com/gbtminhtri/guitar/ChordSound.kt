@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
+import android.media.SoundPool
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -41,8 +42,38 @@ object ChordSound {
     private var player: MediaPlayer? = null
     private var appContext: Context? = null
 
+    // SoundPool: phát file ghi âm gần như tức thì (MediaPlayer phải chuẩn bị mỗi lần nên trễ hơn)
+    private var soundPool: SoundPool? = null
+    private val soundIds = HashMap<String, Int>() // tên hợp âm -> id trong SoundPool
+    private val loadedIds = HashSet<Int>()        // các id đã tải xong
+    private var currentStream = 0
+
+    /** Gọi một lần (các lần sau bị bỏ qua). Tải sẵn các file ghi âm chord_* nếu có. */
     fun init(context: Context) {
-        appContext = context.applicationContext
+        if (appContext != null) return
+        val ctx = context.applicationContext
+        appContext = ctx
+        try {
+            val pool = SoundPool.Builder()
+                .setMaxStreams(2)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .build()
+            pool.setOnLoadCompleteListener { _, sampleId, status ->
+                if (status == 0) synchronized(loadedIds) { loadedIds.add(sampleId) }
+            }
+            for (chord in basicChords) {
+                val resId = ctx.resources.getIdentifier("chord_" + chord.name.lowercase(), "raw", ctx.packageName)
+                if (resId != 0) soundIds[chord.name] = pool.load(ctx, resId, 1)
+            }
+            soundPool = pool
+        } catch (e: Exception) {
+            // không tải được thì dùng MediaPlayer hoặc âm tổng hợp
+        }
     }
 
     /** Tạo trước âm thanh tổng hợp (gọi ở luồng nền) để lần bấm đầu tiên không bị trễ. */
@@ -55,7 +86,7 @@ object ChordSound {
 
     fun play(chord: Chord) {
         val resId = sampleResId(chord)
-        if (resId != 0 && playRecording(resId)) return
+        if (resId != 0 && playRecording(chord, resId)) return
         Thread {
             val samples = synchronized(cache) {
                 cache.getOrPut(chord.name) { synthesize(chord) }
@@ -80,8 +111,25 @@ object ChordSound {
         }
     }
 
-    private fun playRecording(resId: Int): Boolean {
+    private fun playRecording(chord: Chord, resId: Int): Boolean {
         val ctx = appContext ?: return false
+
+        // 1) SoundPool nếu file đã tải xong
+        val pool = soundPool
+        val soundId = soundIds[chord.name]
+        if (pool != null && soundId != null && synchronized(loadedIds) { soundId in loadedIds }) {
+            try {
+                synchronized(this) {
+                    stopCurrent()
+                    currentStream = pool.play(soundId, 1f, 1f, 1, 0, 1f)
+                }
+                if (currentStream != 0) return true
+            } catch (e: Exception) {
+                // thử cách khác bên dưới
+            }
+        }
+
+        // 2) MediaPlayer (dự phòng, ví dụ file quá lớn cho SoundPool)
         return try {
             synchronized(this) {
                 stopCurrent()
@@ -114,6 +162,11 @@ object ChordSound {
         } catch (e: Exception) {
         }
         current = null
+        try {
+            if (currentStream != 0) soundPool?.stop(currentStream)
+        } catch (e: Exception) {
+        }
+        currentStream = 0
         try {
             player?.stop()
         } catch (e: Exception) {
@@ -151,12 +204,22 @@ object ChordSound {
                 stopCurrent() // bấm liên tiếp thì ngắt âm trước đó
                 current = track
             }
+            // Phát hết thì tự giải phóng, không cần một luồng ngủ chờ vài giây
+            track.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+                override fun onMarkerReached(t: AudioTrack) {
+                    synchronized(this@ChordSound) {
+                        if (current === t) current = null
+                    }
+                    try {
+                        t.release()
+                    } catch (e: Exception) {
+                    }
+                }
+
+                override fun onPeriodicNotification(t: AudioTrack) {}
+            })
+            track.setNotificationMarkerPosition(samples.size)
             track.play()
-            Thread.sleep((DURATION_SEC * 1000).toLong() + 150)
-            synchronized(this) {
-                if (current === track) current = null
-            }
-            track.release()
         } catch (e: Exception) {
             // không phát được thì thôi, không làm app bị lỗi
         }

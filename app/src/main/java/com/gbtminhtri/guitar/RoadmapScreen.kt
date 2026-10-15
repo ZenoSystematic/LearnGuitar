@@ -373,7 +373,7 @@ private fun ProgressHero(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 for (offset in 6 downTo 0) {
-                    val time = now - offset * 86_400_000L
+                    val time = DayStreak.daysAgo(now, offset)
                     val done = dayFormat.format(Date(time)) in days
                     val cal = Calendar.getInstance().apply { timeInMillis = time }
                     val label = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]

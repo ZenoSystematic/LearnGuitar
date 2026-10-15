@@ -55,6 +55,13 @@ fun DrillScreen() {
     // Mỗi khi metronome đến nhịp 1 của ô nhịp thì đổi hợp âm
     val metronome = remember { Metronome { beat -> if (beat == 0) bar += 1 } }
     DisposableEffect(Unit) { onDispose { metronome.stop() } }
+    // Xuống nền giữa lượt tập thì hủy lượt đó (đồng hồ không chạy ngầm rồi lưu kết quả sai)
+    StopWhenBackgrounded {
+        if (phase == Phase.RUNNING) {
+            metronome.stop()
+            phase = Phase.IDLE
+        }
+    }
 
     fun finishDrill() {
         metronome.stop()

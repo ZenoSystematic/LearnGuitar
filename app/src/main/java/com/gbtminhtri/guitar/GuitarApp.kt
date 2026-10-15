@@ -9,6 +9,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
@@ -38,18 +39,31 @@ private fun NavHostController.goTo(route: String) {
     }
 }
 
+/**
+ * Mở một màn hình. Tab thì chuyển tab; màn phụ (tuner, quiz...) thì xếp chồng lên màn hiện tại
+ * để bấm Back quay lại đúng nơi vừa mở (ví dụ từ tab Hợp âm mở Quiz, Back về Hợp âm).
+ */
+private fun NavHostController.openRoute(route: String) {
+    if (tabs.any { it.route == route }) goTo(route) else navigate(route) { launchSingleTop = true }
+}
+
 @Composable
 fun GuitarApp() {
     val nav = rememberNavController()
-    ChordSound.init(LocalContext.current) // để ChordSound tìm được file ghi âm trong res/raw
+    val appContext = LocalContext.current
+    remember(appContext) { ChordSound.init(appContext) } // để ChordSound tìm được file ghi âm trong res/raw
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
+    // Đang ở màn phụ thì sáng tab nằm ngay bên dưới nó (tab bạn vừa mở nó từ đó)
+    val selectedRoute = if (tabs.any { it.route == current }) current
+    else backStack?.let { nav.previousBackStackEntry?.destination?.route }
+        ?.takeIf { r -> tabs.any { it.route == r } } ?: "today"
 
     Scaffold(
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
                 tabs.forEach { tab ->
-                    val selected = current == tab.route
+                    val selected = selectedRoute == tab.route
                     NavigationBarItem(
                         selected = selected,
                         onClick = { nav.goTo(tab.route) },
@@ -76,14 +90,14 @@ fun GuitarApp() {
             startDestination = "today",
             modifier = Modifier.padding(padding)
         ) {
-            composable("today") { TodayScreen(onOpen = { route -> nav.goTo(route) }) }
+            composable("today") { TodayScreen(onOpen = { route -> nav.openRoute(route) }) }
             composable("metronome") { MetronomeScreen() }
             composable("strings") { StringQuizScreen() }
             composable("chordquiz") { ChordQuizScreen() }
             composable("ear") { EarTrainingScreen() }
-            composable("daily") { DailyChallengeScreen(onDone = { nav.goTo("today") }) }
+            composable("daily") { DailyChallengeScreen(onDone = { nav.popBackStack() }) }
             composable("tuner") { TunerScreen() }
-            composable("chords") { ChordsScreen(onOpen = { route -> nav.goTo(route) }) }
+            composable("chords") { ChordsScreen(onOpen = { route -> nav.openRoute(route) }) }
             composable("practice") { DrillScreen() }
             composable("pattern") { PatternScreen() }
             composable("roadmap") { RoadmapScreen() }
