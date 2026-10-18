@@ -9,7 +9,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
@@ -31,11 +30,19 @@ private val tabs = listOf(
     Tab("roadmap", "Tiến bộ", "📈")
 )
 
+/**
+ * Bấm một tab: về màn gốc của tab đó.
+ * - Tab đã nằm trong chồng màn hình (ví dụ đang ở Tuner mở từ Hôm nay, bấm Hôm nay): bỏ hết các màn phụ xếp trên nó.
+ * - Tab chưa có trong chồng: mở tab, bỏ các màn khác ngoài màn khởi đầu.
+ * Cố ý không dùng saveState/restoreState: các màn hình ở đây không giữ trạng thái giữa các lần mở,
+ * và cơ chế đó có thể khôi phục lại cả màn phụ cũ khiến bấm tab mà không thấy đổi gì.
+ */
 private fun NavHostController.goTo(route: String) {
-    navigate(route) {
-        popUpTo(graph.startDestinationId) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    if (!popBackStack(route, inclusive = false)) {
+        navigate(route) {
+            popUpTo(graph.startDestinationId)
+            launchSingleTop = true
+        }
     }
 }
 
@@ -51,7 +58,9 @@ private fun NavHostController.openRoute(route: String) {
 fun GuitarApp() {
     val nav = rememberNavController()
     val appContext = LocalContext.current
-    remember(appContext) { ChordSound.init(appContext) } // để ChordSound tìm được file ghi âm trong res/raw
+    // Để ChordSound tìm được file ghi âm trong res/raw. init() chỉ chạy thật ở lần gọi đầu (các lần sau bị bỏ qua),
+    // và phải xong trước khi các màn hình con phát âm thanh, nên gọi thẳng ở đây thay vì trong remember.
+    ChordSound.init(appContext)
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
     // Đang ở màn phụ thì sáng tab nằm ngay bên dưới nó (tab bạn vừa mở nó từ đó)

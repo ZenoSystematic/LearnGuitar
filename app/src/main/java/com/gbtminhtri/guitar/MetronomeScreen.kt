@@ -1,5 +1,6 @@
 package com.gbtminhtri.guitar
 
+import android.content.Context
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -16,9 +17,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/**
+ * Một loại nhịp (số chỉ nhịp).
+ * beats: số phách mạnh trong ô nhịp. stepsPerBeat: mỗi phách chia thành mấy tiếng.
+ * 2/4, 3/4, 4/4: mỗi phách một tiếng. 6/8: 2 phách, mỗi phách chia 3 (đếm 1 2 3 4 5 6, nhấn ở 1 và 4),
+ * khi đó BPM là tốc độ của mỗi nhóm 3 (nốt đen chấm), cách chỉnh metronome thông thường cho nhịp 6/8.
+ */
+private data class TimeSig(
+    val label: String,
+    val beats: Int,
+    val stepsPerBeat: Int,
+    val hint: String
+)
+
+private val timeSigs = listOf(
+    TimeSig("2/4", 2, 1, "2 phách: mạnh, nhẹ. Hợp với hành khúc, polka. Đếm: 1 2"),
+    TimeSig("3/4", 3, 1, "3 phách: mạnh, nhẹ, nhẹ. Điệu valse (bùm, chát, chát). Đếm: 1 2 3"),
+    TimeSig("4/4", 4, 1, "4 phách, phổ biến nhất trong pop, rock, ballad. Đếm: 1 2 3 4"),
+    TimeSig(
+        "6/8", 2, 3,
+        "6 tiếng chia thành 2 nhóm 3, nhấn ở 1 và 4, cảm giác nhún nhảy như ballad 6/8. " +
+                "BPM ở đây là tốc độ của mỗi nhóm 3. Đếm: 1 2 3 4 5 6"
+    )
+)
 
 private fun tempoName(bpm: Int) = when {
     bpm < 60 -> "Rất chậm"
@@ -28,38 +55,60 @@ private fun tempoName(bpm: Int) = when {
     else -> "Nhanh"
 }
 
-/** Chấm nhịp: phình to khi đến phách của nó; phách 1 (accent) to hơn một chút. */
+/**
+ * Chấm nhịp kèm số đếm bên dưới. level: 2 = tiếng đầu ô nhịp (mạnh nhất),
+ * 1 = đầu mỗi phách, 0 = các tiếng chia nhỏ. Chấm phình to khi đến lượt của nó.
+ */
 @Composable
-private fun BeatDot(active: Boolean, accent: Boolean) {
+private fun BeatDot(cell: Dp, level: Int, active: Boolean, label: String) {
+    val factor = when (level) {
+        2 -> if (active) 0.92f else 0.68f
+        1 -> if (active) 0.80f else 0.58f
+        else -> if (active) 0.68f else 0.46f
+    }
     val dotSize by animateDpAsState(
-        targetValue = when {
-            active && accent -> 44.dp
-            active -> 38.dp
-            accent -> 32.dp
-            else -> 26.dp
-        },
+        targetValue = cell * factor,
         animationSpec = tween(90),
         label = "beatDot"
     )
-    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-        Box(
-            modifier = Modifier
-                .size(dotSize)
-                .clip(CircleShape)
-                .background(if (active) Color.White else Color.White.copy(alpha = 0.3f))
+    Column(modifier = Modifier.width(cell), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.size(cell), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(dotSize)
+                    .clip(CircleShape)
+                    .background(
+                        if (active) Color.White
+                        else Color.White.copy(alpha = if (level == 0) 0.22f else 0.32f)
+                    )
+            )
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (level == 2) FontWeight.Bold else FontWeight.Normal,
+            color = Color.White.copy(alpha = if (level > 0) 0.95f else 0.7f)
         )
     }
 }
 
 @Composable
 fun MetronomeScreen() {
-    var bpm by remember { mutableIntStateOf(80) }
+    val context = LocalContext.current
+    val prefs = remember {
+        context.applicationContext.getSharedPreferences("metronome", Context.MODE_PRIVATE)
+    }
+
+    var bpm by remember { mutableIntStateOf(prefs.getInt("bpm", 80).coerceIn(40, 200)) }
+    var sigIndex by remember { mutableIntStateOf(prefs.getInt("sig", 2).coerceIn(0, timeSigs.lastIndex)) }
     var playing by remember { mutableStateOf(false) }
-    var currentBeat by remember { mutableIntStateOf(-1) }
-    val beatsPerBar = 4
+    var currentStep by remember { mutableIntStateOf(-1) }
+
+    val sig = timeSigs[sigIndex]
+    val totalSteps = sig.beats * sig.stepsPerBeat
 
     val metronome = remember {
-        Metronome { beat -> currentBeat = beat }
+        Metronome(onStep = { s -> currentStep = s }) { }
     }
 
     // Dừng metronome khi rời màn hình
@@ -70,12 +119,22 @@ fun MetronomeScreen() {
     StopWhenBackgrounded {
         metronome.stop()
         playing = false
-        currentBeat = -1
+        currentStep = -1
     }
 
     fun setBpm(value: Int) {
         bpm = value.coerceIn(40, 200)
         metronome.bpm = bpm
+        prefs.edit().putInt("bpm", bpm).apply()
+    }
+
+    fun changeSig(index: Int) {
+        sigIndex = index
+        currentStep = -1
+        prefs.edit().putInt("sig", index).apply()
+        // Đổi nhịp khi đang chạy thì có hiệu lực ngay ở bước kế tiếp
+        metronome.stepsPerBeat = timeSigs[index].stepsPerBeat
+        metronome.beatsPerBar = timeSigs[index].beats
     }
 
     Column(
@@ -87,7 +146,7 @@ fun MetronomeScreen() {
     ) {
         ScreenHeader("⏱️", "Metronome", "Giữ nhịp đều khi tập")
 
-        // Thẻ lớn: tốc độ + chấm nhịp
+        // Thẻ lớn: tốc độ + nhịp + chấm nhịp
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -97,7 +156,7 @@ fun MetronomeScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                tempoName(bpm),
+                "${tempoName(bpm)}  ·  ${sig.label}",
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White.copy(alpha = 0.85f)
             )
@@ -108,11 +167,37 @@ fun MetronomeScreen() {
                 color = Color.White.copy(alpha = 0.85f)
             )
             Spacer(Modifier.height(12.dp))
+            val cell = if (totalSteps > 4) 40.dp else 48.dp
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                repeat(beatsPerBar) { i ->
-                    BeatDot(active = playing && currentBeat == i, accent = i == 0)
+                repeat(totalSteps) { i ->
+                    val level = when {
+                        i == 0 -> 2
+                        i % sig.stepsPerBeat == 0 -> 1
+                        else -> 0
+                    }
+                    BeatDot(
+                        cell = cell,
+                        level = level,
+                        active = playing && currentStep == i,
+                        label = (i + 1).toString()
+                    )
                 }
             }
+        }
+
+        // Chọn nhịp
+        AppCard {
+            Text(
+                "Nhịp",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            PillRow(
+                labels = timeSigs.map { it.label },
+                selectedIndex = sigIndex,
+                onSelect = { changeSig(it) }
+            )
+            Text(sig.hint, style = MaterialTheme.typography.bodyMedium)
         }
 
         // Chỉnh tốc độ
@@ -135,10 +220,11 @@ fun MetronomeScreen() {
             onClick = {
                 if (playing) {
                     metronome.stop()
-                    currentBeat = -1
+                    currentStep = -1
                 } else {
                     metronome.bpm = bpm
-                    metronome.beatsPerBar = beatsPerBar
+                    metronome.stepsPerBeat = sig.stepsPerBeat
+                    metronome.beatsPerBar = sig.beats
                     metronome.start()
                 }
                 playing = !playing
